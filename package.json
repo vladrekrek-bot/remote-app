@@ -1,0 +1,15 @@
+{
+  "name": "shkwizi-remote",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SHKWIZI Remote — управление компьютером с айфона. iOS через Capacitor, Windows-сервер на Python",
+  "author": "SHKWIZI",
+  "dependencies": {
+    "@capacitor/core": "latest",
+    "@capacitor/ios": "latest",
+    "@capacitor/app": "latest"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "latest"
+  }
+}
