@@ -1,0 +1,92 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>SHKWIZI Remote</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+html,body{height:100%;background:#0b0614;color:#f3eaff;font-family:-apple-system,system-ui,sans-serif;overflow:hidden;position:fixed;inset:0;touch-action:manipulation}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:calc(env(safe-area-inset-top) + 20px) 22px calc(env(safe-area-inset-bottom) + 20px);
+ background:radial-gradient(circle at 25% 15%,#3a1366 0,transparent 55%),radial-gradient(circle at 85% 90%,#5a0f45 0,transparent 50%),#0b0614}
+.logo{font-size:32px;font-weight:800;background:linear-gradient(90deg,#b44cff,#ff4fa3);-webkit-background-clip:text;color:transparent}
+.sub{color:#9b8bb5;font-size:14px;text-align:center;line-height:1.4}
+.glass{width:min(360px,100%);padding:18px;border-radius:24px;background:#ffffff0d;border:1px solid #ffffff1f;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);display:flex;flex-direction:column;gap:10px}
+input{width:100%;font-size:20px;text-align:center;padding:14px;border-radius:14px;border:1px solid #b44cff66;background:#170d26;color:#fff;outline:none;-webkit-user-select:text;user-select:text}
+button{border:0;border-radius:16px;color:#fff;font-weight:800;font-size:17px;padding:15px;touch-action:manipulation}
+.main{background:linear-gradient(135deg,#b44cff,#ff4fa3);box-shadow:0 8px 30px #b44cff55}
+.sec{background:#ffffff14}
+.pc{background:#ffffff10;border:1px solid #b44cff55;text-align:left;display:flex;justify-content:space-between;font-weight:700}
+.pc span{color:#9b8bb5;font-weight:500;font-size:14px}
+#msg{min-height:18px;font-size:14px;color:#ff4fa3;text-align:center}
+#list{display:flex;flex-direction:column;gap:8px}
+.hidden{display:none!important}
+</style></head><body>
+<div class="logo">SHKWIZI Remote</div>
+<div class="sub">Запусти SHKWIZI Remote на компьютере.<br>Телефон и ПК — в одной Wi-Fi сети.</div>
+
+<div class="glass">
+ <button id="bLast" class="pc hidden"></button>
+ <button id="bScan" class="main">🔍 Найти компьютер</button>
+ <div id="list"></div>
+ <div id="msg"></div>
+</div>
+
+<div class="glass">
+ <div class="sub">или введи адрес из окна на ПК</div>
+ <input id="addr" placeholder="192.168.1.5" inputmode="decimal" autocapitalize="off" autocorrect="off">
+ <button id="bGo" class="sec">Подключиться</button>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const PORT=8765;
+function load(k){try{return localStorage.getItem('rl_'+k)}catch(e){return null}}
+function save(k,v){try{localStorage.setItem('rl_'+k,v)}catch(e){}}
+function norm(a){a=(a||'').trim().replace(/^https?:\/\//,'').replace(/\/.*$/,'');if(!a)return'';if(!/:\d+$/.test(a))a+=':'+PORT;return a}
+function go(host,name){host=norm(host);if(!host)return;save('last',host);if(name)save('lastName',name);
+  $('msg').style.color='#9b8bb5';$('msg').textContent='Подключаюсь к '+host+'…';
+  location.href='http://'+host+'/?app=1'}
+
+function ping(host,ms){
+  return new Promise(res=>{
+    const t=setTimeout(()=>res(null),ms);
+    fetch('http://'+host+'/ping',{cache:'no-store'}).then(r=>r.json()).then(j=>{clearTimeout(t);res(j&&j.app==='shkwizi-remote'?j:null)}).catch(()=>{clearTimeout(t);res(null)});
+  });
+}
+
+const last=load('last');
+if(last){const b=$('bLast');b.classList.remove('hidden');b.innerHTML='🖥 '+(load('lastName')||'Последний ПК')+' <span>'+last.split(':')[0]+'</span>';b.onclick=()=>go(last)}
+$('addr').value=last?last.replace(':'+PORT,''):'';
+$('bGo').onclick=()=>go($('addr').value);
+$('addr').addEventListener('keydown',e=>{if(e.key==='Enter')go($('addr').value)});
+
+let scanning=false;
+$('bScan').onclick=async()=>{
+  if(scanning)return;scanning=true;$('list').innerHTML='';$('msg').style.color='#9b8bb5';
+  const subs=[];const seen=new Set();
+  if(last){const p=last.split(':')[0].split('.');if(p.length===4)subs.push(p.slice(0,3).join('.'))}
+  ['192.168.0','192.168.1','192.168.100','192.168.31','192.168.88','192.168.8','192.168.43','192.168.50','10.0.0','192.168.2','192.168.178','192.168.10','172.20.10'].forEach(s=>subs.push(s));
+  const found=[];
+  for(const s of subs){
+    if(seen.has(s))continue;seen.add(s);
+    $('msg').textContent='Ищу в сети '+s+'.x …';
+    const hosts=[];for(let i=1;i<255;i++)hosts.push(s+'.'+i+':'+PORT);
+    for(let k=0;k<hosts.length;k+=64){
+      const part=hosts.slice(k,k+64);
+      const rs=await Promise.all(part.map(h=>ping(h,1200).then(j=>j&&{h,j})));
+      rs.filter(Boolean).forEach(r=>{found.push(r);addPc(r.h,r.j.name)});
+    }
+    if(found.length)break;
+  }
+  scanning=false;
+  $('msg').textContent=found.length?'Нажми на компьютер':'Не нашёл. Проверь Wi-Fi и что программа на ПК запущена, или введи адрес вручную. Если айфон спрашивал «Локальная сеть» — разреши и попробуй ещё раз.';
+  if(!found.length)$('msg').style.color='#ff4fa3';
+};
+function addPc(h,name){const b=document.createElement('button');b.className='pc';b.innerHTML='🖥 '+(name||'Компьютер')+' <span>'+h.split(':')[0]+'</span>';b.onclick=()=>go(h,name);$('list').appendChild(b)}
+
+/* QR с компьютера (shkwizi-remote://c?h=IP:PORT) открывает приложение и сразу подключает */
+function handleUrl(u){const m=/[?&]h=([^&]+)/.exec(u||'');if(m)go(decodeURIComponent(m[1]))}
+try{
+  const App=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.App;
+  if(App){App.addListener('appUrlOpen',e=>handleUrl(e.url));
+    if(!/back=1/.test(location.search))App.getLaunchUrl().then(r=>r&&handleUrl(r.url)).catch(()=>{})}
+}catch(e){}
+</script></body></html>
