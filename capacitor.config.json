@@ -1,0 +1,13 @@
+{
+  "appId": "com.shkwizi.remote",
+  "appName": "SHKWIZI Remote",
+  "webDir": "www",
+  "backgroundColor": "#0b0614",
+  "ios": { "contentInset": "never", "backgroundColor": "#0b0614", "scrollEnabled": false },
+  "server": {
+    "allowNavigation": ["*", "*.*", "*.*.*", "*.*.*.*", "*.*.*.*.*"]
+  },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true }
+  }
+}
